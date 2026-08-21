@@ -21,25 +21,24 @@ and what to do to become fully independent.
 - **Email is migrated.** `lib/email.ts` now sends via Resend
   (`RESEND_API_KEY` + `EMAIL_FROM`) instead of Abacus's notification API.
   All four send sites (contact form, order confirmation, new-order admin
-  alert, order status update) go through it. You still need to: create a
-  Resend account, verify a sending domain for `elev8wear.al`, and put
-  `RESEND_API_KEY`/`EMAIL_FROM` in `.env` (and in Vercel's env vars once
-  deployed) — until then emails just log an error and are skipped, orders
-  still save fine.
+  alert, order status update) go through it. Domain `elev8wear.al` is
+  verified in Resend (DKIM/SPF/DMARC DNS records added at the registrar).
+  Still need to put `RESEND_API_KEY`/`EMAIL_FROM` in `.env` and in Vercel's
+  env vars once deployed.
+- **Database is migrated.** Created a Neon Postgres project. Since the
+  Abacus-hosted DB only had demo/seed data (no real customer orders to
+  preserve), we generated the schema as raw SQL from `prisma/schema.prisma`
+  (`prisma migrate diff --from-empty`) and the seed data as raw SQL from
+  `scripts/seed.ts`, and ran both through Neon's SQL Editor (this sandboxed
+  session can't open a direct Postgres/HTTPS connection to any DB, by
+  design — verified via `psql` timeout and a blocked egress-proxy CONNECT).
+  Verified row counts in Neon match: 12 products, 4 DTF designs, 2 users,
+  1 shipping settings row. Still need to put the Neon `DATABASE_URL` in
+  `.env` and Vercel's env vars.
 
 ## Remaining Abacus dependencies (need your input to finish)
 
-### 1. Database — Abacus-hosted Postgres
-`DATABASE_URL` currently points at `*.hosteddb.reai.io`, a Postgres instance
-Abacus provisions and owns. To own your data:
-1. Create a Postgres database with a provider of your choice (Neon, Supabase,
-   Railway, or your own server/RDS).
-2. `pg_dump` the Abacus database and restore it into the new one (or run
-   `prisma migrate deploy` / `prisma db push` against the new empty DB and
-   re-seed if you don't need to keep existing orders/users).
-3. Update `DATABASE_URL` to the new connection string.
-
-### 2. File storage — Abacus-hosted S3 bucket
+### 1. File storage — Abacus-hosted S3 bucket
 `AWS_BUCKET_NAME=abacusai-apps-...` is a bucket inside Abacus's own AWS
 account, and the app authenticates with an implicit instance credential
 (no access key is stored anywhere) — so uploads simply won't work once this
@@ -55,16 +54,12 @@ runs outside Abacus's hosting.
    those images and re-upload them, then update the URLs (DB rows via admin
    panel or a script; hardcoded ones in code via find/replace).
 
-### 3. Transactional email — done in code, needs your Resend account
-Done: all sending now goes through `lib/email.ts` using Resend. Left for
-you:
-1. Create a Resend account, add and verify `elev8wear.al` (DNS records).
-2. Set `RESEND_API_KEY` and `EMAIL_FROM` in `.env` / your host's env vars.
-
-### 4. Hosting
-The live site is deployed at `elev8.abacusai.app`. Once the above three are
-migrated, deploy this repo to a host you control (Vercel is the easiest fit
-for Next.js) and point your domain (`elev8wear.al`) at it.
+### 2. Hosting
+The live site is deployed at `elev8.abacusai.app`. Once storage is migrated,
+deploy this repo to a host you control (Vercel is the easiest fit for
+Next.js) and point your domain (`elev8wear.al`) at it, with `DATABASE_URL`
+(Neon), `RESEND_API_KEY`/`EMAIL_FROM` (Resend), and the AWS variables set
+as environment variables there.
 
 ## Rotate secrets
 
