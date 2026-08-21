@@ -38,12 +38,21 @@ and what to do to become fully independent.
 
 - **File storage is migrated.** Created our own S3 bucket
   (`elev8wear-uploads`, `eu-north-1`) with a bucket policy that public-reads
-  only the `public/*` prefix, CORS for browser uploads, and an IAM user
-  (`elev8wear-app`) scoped to just this bucket (`PutObject`/`GetObject`/
-  `DeleteObject`/`ListBucket` — nothing else). Verified end-to-end
-  (put/get/public-read) from a throwaway script before wiring the real
-  credentials in. New uploads through the admin panel now land here, not
-  on Abacus's shared bucket.
+  only the `public/*` prefix, CORS for browser uploads (including the
+  `www.elev8wear.al` origin the site actually serves from, after Vercel's
+  apex→www redirect), and an IAM user (`elev8wear-app`) scoped to just this
+  bucket (`PutObject`/`GetObject`/`DeleteObject`/`ListBucket` — nothing
+  else). Uploads initially failed in production even with correct
+  credentials in Vercel: `AWS_REGION`/`AWS_ACCESS_KEY_ID`/
+  `AWS_SECRET_ACCESS_KEY` are reserved names on the Lambda runtime Vercel
+  builds on, silently overridden at request time by Vercel's own
+  execution-role credentials — so the S3 client was authenticating as
+  Vercel's role (no access to our bucket), not ours. Fixed by renaming to
+  `S3_REGION`/`S3_ACCESS_KEY_ID`/`S3_SECRET_ACCESS_KEY` and passing them to
+  `S3Client` explicitly (`lib/aws-config.ts`) instead of relying on the
+  default credential chain. Verified working end-to-end: admin panel image
+  upload succeeds and displays. New uploads through the admin panel now
+  land here, not on Abacus's shared bucket.
 - **Hosting is migrated.** Deployed this repo to Vercel (Production =
   `claude/elev8wear-faqja-5wv1su`, the repo's only branch), with
   `DATABASE_URL` (Neon), `RESEND_API_KEY`/`EMAIL_FROM` (Resend), and the
