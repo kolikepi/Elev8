@@ -1,0 +1,296 @@
+generator client {
+    provider = "prisma-client-js"
+    binaryTargets = ["native", "linux-musl-arm64-openssl-3.0.x"]
+    output = "/home/ubuntu/elev8_sportswear/nextjs_space/node_modules/.prisma/client"
+}
+
+datasource db {
+    provider = "postgresql"
+    url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  password      String?
+  image         String?
+  role          String    @default("user")
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  accounts      Account[]
+  sessions      Session[]
+  cartItems     CartItem[]
+  orders        Order[]
+  addresses     Address[]
+  wishlistItems WishlistItem[]
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model Product {
+  id              String     @id @default(cuid())
+  name            String
+  slug            String     @unique
+  description     String     @db.Text
+  price           Float
+  originalPrice   Float?
+  category        String
+  sizes           String[]   // Available sizes
+  colors          String[]   // Available colors
+  colorHexCodes   String[]   // Hex codes for colors
+  gsm             Int?       // Fabric weight
+  fabricType      String?
+  imageUrl        String
+  imageUrls       String[]   // Additional images
+  careInstructions String[]  // Care instructions array
+  features        String[]   // Product features
+  isFeatured      Boolean    @default(false)
+  isBestSeller    Boolean    @default(false)
+  inStock         Boolean    @default(true)
+  status          String     @default("active") // "draft" or "active" — only active show publicly
+  // Phase 2 — new fields (all optional for safe migration)
+  gender          String?    // "men", "women", "unisex"
+  activity        String?    // "running", "training", "lifestyle"
+  collection      String?    // e.g., "Summer 2026", "Essentials"
+  fit             String?    // "regular", "slim", "oversized", "compression"
+  sku             String?
+  badge           String?    // "NEW", "BEST", "SALE", "LIMITED"
+  modelHeight     String?    // e.g., "185cm"
+  modelSize       String?    // e.g., "M" — what size the model wears
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+  cartItems       CartItem[]
+  variants        ProductVariant[]
+  wishlistItems   WishlistItem[]
+
+  @@index([gender])
+  @@index([activity])
+  @@index([collection])
+}
+
+model ProductVariant {
+  id               String    @id @default(cuid())
+  productId        String
+  product          Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  color            String
+  colorHex         String?
+  size             String
+  sku              String?
+  stockQuantity    Int       @default(0)
+  lowStockThreshold Int?     // when set, stock <= threshold (and > 0) shows "Low stock"
+  active           Boolean   @default(true)
+  cartItems        CartItem[]
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@unique([productId, color, size])
+  @@index([productId])
+  @@index([sku])
+}
+
+model CartItem {
+  id        String   @id @default(cuid())
+  userId    String
+  productId String
+  variantId String?
+  quantity  Int      @default(1)
+  size      String
+  color     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  variant   ProductVariant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
+
+  @@unique([userId, productId, size, color])
+}
+
+model ContactSubmission {
+  id        String   @id @default(cuid())
+  name      String
+  email     String
+  subject   String?
+  message   String   @db.Text
+  status    String   @default("new")
+  createdAt DateTime @default(now())
+}
+
+model NewsletterSignup {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  createdAt DateTime @default(now())
+}
+
+model Order {
+  id              String      @id @default(cuid())
+  orderNumber     String      @unique
+  userId          String
+  user            User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  status          String      @default("pending")  // pending, confirmed, processing, shipped, delivered, cancelled
+  firstName       String
+  lastName        String
+  email           String
+  phone           String
+  address         String
+  city            String
+  postalCode      String?
+  notes           String?     @db.Text
+  paymentMethod   String      @default("cod")  // cod, bank_transfer
+  subtotal        Float
+  shippingCost    Float
+  total           Float
+  carrier         String?     // optional shipping carrier name
+  trackingNumber  String?     // optional tracking number
+  trackingUrl     String?     // optional tracking URL
+  items           OrderItem[]
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  @@index([userId])
+  @@index([status])
+}
+
+model OrderItem {
+  id          String  @id @default(cuid())
+  orderId     String
+  order       Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId   String
+  variantId   String?
+  productName String
+  productImage String
+  price       Float
+  quantity    Int
+  size        String
+  color       String
+}
+
+model Address {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  label      String?  // e.g. "Home", "Work"
+  firstName  String
+  lastName   String
+  phone      String
+  address    String
+  city       String
+  postalCode String?
+  isDefault  Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([userId])
+}
+
+model WishlistItem {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, productId])
+  @@index([userId])
+}
+
+model ShippingSetting {
+  id                    String   @id @default("singleton")
+  freeShippingEnabled   Boolean  @default(true)
+  freeShippingThreshold Float    @default(50)
+  // Tirana region
+  tiranaEnabled         Boolean  @default(true)
+  tiranaRate            Float    @default(3)
+  tiranaDeliveryText    String?
+  // Rest of Albania
+  albaniaEnabled        Boolean  @default(true)
+  standardRate          Float    @default(5)
+  albaniaDeliveryText   String?
+  // Optional international
+  internationalEnabled  Boolean  @default(false)
+  internationalRate     Float    @default(0)
+  internationalDeliveryText String?
+  updatedAt             DateTime @updatedAt
+}
+
+model SiteSetting {
+  id                 String   @id @default("singleton")
+  // Business info
+  businessName       String   @default("ELEV8")
+  publicEmail        String?  // shown publicly to customers
+  adminEmail         String?  // internal admin notification recipient
+  phone              String?
+  whatsapp           String?
+  addressLine        String?
+  country            String?  @default("Albania")
+  currency           String   @default("EUR")
+  instagram          String?
+  tiktok             String?
+  websiteUrl         String?
+  // Returns & exchanges
+  returnWindowDays   Int?     // null = not configured
+  exchangeAllowed    Boolean  @default(false)
+  returnConditions   String?  @db.Text
+  returnShippingPaidBy String? // "customer" or "merchant"
+  nonReturnableItems String?  @db.Text
+  returnProcedure    String?  @db.Text
+  // Payment methods
+  codEnabled         Boolean  @default(true)
+  bankTransferEnabled Boolean @default(true)
+  bankName           String?
+  bankAccountHolder  String?
+  bankIban           String?
+  bankSwift          String?
+  bankInstructions   String?  @db.Text
+  cardPaymentsEnabled Boolean @default(false) // future — no provider integrated
+  // Order status emails
+  orderStatusEmailsEnabled Boolean @default(true)
+  updatedAt          DateTime @updatedAt
+}
+
+model DtfDesign {
+  id        String   @id @default(cuid())
+  name      String
+  imageUrl  String
+  category  String   @default("Logo")
+  active    Boolean  @default(true)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([active])
+}
