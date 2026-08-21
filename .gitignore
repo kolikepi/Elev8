@@ -25,9 +25,3 @@ yarn-error.log*
 
 # prisma
 /prisma/*.db
-
-# forwardone app
-/forwardone/node_modules
-/forwardone/.next/
-/forwardone/abacus-export/
-/forwardone/abacus-files/
