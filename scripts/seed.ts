@@ -1,5 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
 
 const prisma = new PrismaClient();
 
@@ -210,11 +211,16 @@ const products = [
   },
 ];
 
+function randomPassword(): string {
+  return crypto.randomBytes(12).toString('base64url');
+}
+
 async function main() {
   console.log('Seeding database...');
-  
-  // Create test user
-  const hashedPassword = await bcrypt.hash('johndoe123', 10);
+
+  // Create test user (random password each run unless SEED_TEST_PASSWORD is set)
+  const testPassword = process.env.SEED_TEST_PASSWORD || randomPassword();
+  const hashedPassword = await bcrypt.hash(testPassword, 10);
   await prisma.user.upsert({
     where: { email: 'john@doe.com' },
     update: {},
@@ -225,10 +231,11 @@ async function main() {
       role: 'user',
     },
   });
-  console.log('Test user created');
+  console.log(`Test user created (john@doe.com / ${testPassword})`);
 
-  // Create admin user for kolikepi.17@gmail.com
-  const adminPassword = await bcrypt.hash('Elev8Admin123', 10);
+  // Create admin user for kolikepi.17@gmail.com (random password each run unless SEED_ADMIN_PASSWORD is set)
+  const adminPlainPassword = process.env.SEED_ADMIN_PASSWORD || randomPassword();
+  const adminPassword = await bcrypt.hash(adminPlainPassword, 10);
   await prisma.user.upsert({
     where: { email: 'kolikepi.17@gmail.com' },
     update: { 
@@ -243,7 +250,7 @@ async function main() {
       role: 'admin',
     },
   });
-  console.log('Admin user created/updated: kolikepi.17@gmail.com');
+  console.log(`Admin user created/updated: kolikepi.17@gmail.com / ${adminPlainPassword}`);
   
   // Also make kolikepi@gmail.com admin if it exists
   const existingUser = await prisma.user.findUnique({ where: { email: 'kolikepi@gmail.com' } });
