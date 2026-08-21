@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { getShippingConfig, computeShipping } from '@/lib/shipping';
 import { getSiteSettings } from '@/lib/settings';
+import { sendEmail } from '@/lib/email';
 
 export const dynamic = 'force-dynamic';
 
@@ -190,9 +191,7 @@ async function sendOrderEmails(order: {
   items: { productName: string; size: string; color: string; quantity: number; price: number; productImage: string }[];
 }, customerEmail: string) {
   const settings = await getSiteSettings();
-  const appUrl = process.env.NEXTAUTH_URL || '';
   const appName = settings.businessName || 'ELEV8';
-  const senderEmail = appUrl ? `noreply@${new URL(appUrl).hostname}` : 'noreply@elev8.abacusai.app';
   const adminRecipient = settings.adminEmail || process.env.ADMIN_NOTIFICATION_EMAIL || '';
 
   const itemsHtml = order.items.map(item => `
@@ -247,28 +246,16 @@ async function sendOrderEmails(order: {
   `;
 
   // Send to customer
-  try {
-    await fetch('https://apps.abacus.ai/api/sendNotificationEmail', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        deployment_token: process.env.ABACUSAI_API_KEY,
-        app_id: process.env.WEB_APP_ID,
-        notification_id: process.env.NOTIF_ID_ORDER_CONFIRMATION,
-        subject: `ELEV8 — Porosia #${order.orderNumber} u konfirmua`,
-        body: customerHtml,
-        is_html: true,
-        recipient_email: customerEmail,
-        sender_email: senderEmail,
-        sender_alias: appName,
-      }),
-    });
-  } catch (e) { console.error('Customer email failed:', e); }
+  await sendEmail({
+    to: customerEmail,
+    subject: `ELEV8 — Porosia #${order.orderNumber} u konfirmua`,
+    html: customerHtml,
+    fromName: appName,
+  });
 
   // Send to admin (only when an internal notification email is configured)
   if (!adminRecipient) return;
-  try {
-    const adminHtml = `
+  const adminHtml = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #000; color: #fff; padding: 30px;">
         <h2 style="color: #32FF6A;">Porosi e Re! 🛒</h2>
         <p style="color: #ccc;">Porosi <strong>#${order.orderNumber}</strong> nga <strong>${order.firstName} ${order.lastName}</strong></p>
@@ -279,20 +266,10 @@ async function sendOrderEmails(order: {
         <p style="color: #888;">${order.items.map(i => `${i.quantity}x ${i.productName} (${i.size}/${i.color})`).join(', ')}</p>
       </div>
     `;
-    await fetch('https://apps.abacus.ai/api/sendNotificationEmail', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        deployment_token: process.env.ABACUSAI_API_KEY,
-        app_id: process.env.WEB_APP_ID,
-        notification_id: process.env.NOTIF_ID_NEW_ORDER_ALERT,
-        subject: `Porosi e Re #${order.orderNumber} — €${order.total.toFixed(2)}`,
-        body: adminHtml,
-        is_html: true,
-        recipient_email: adminRecipient,
-        sender_email: senderEmail,
-        sender_alias: appName,
-      }),
-    });
-  } catch (e) { console.error('Admin email failed:', e); }
+  await sendEmail({
+    to: adminRecipient,
+    subject: `Porosi e Re #${order.orderNumber} — €${order.total.toFixed(2)}`,
+    html: adminHtml,
+    fromName: appName,
+  });
 }

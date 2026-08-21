@@ -18,6 +18,14 @@ and what to do to become fully independent.
   anyone can see which variables are required to run the app.
 - The real `.env` (with live credentials) was intentionally **not**
   committed. See "Rotate secrets" below.
+- **Email is migrated.** `lib/email.ts` now sends via Resend
+  (`RESEND_API_KEY` + `EMAIL_FROM`) instead of Abacus's notification API.
+  All four send sites (contact form, order confirmation, new-order admin
+  alert, order status update) go through it. You still need to: create a
+  Resend account, verify a sending domain for `elev8wear.al`, and put
+  `RESEND_API_KEY`/`EMAIL_FROM` in `.env` (and in Vercel's env vars once
+  deployed) — until then emails just log an error and are skipped, orders
+  still save fine.
 
 ## Remaining Abacus dependencies (need your input to finish)
 
@@ -47,17 +55,11 @@ runs outside Abacus's hosting.
    those images and re-upload them, then update the URLs (DB rows via admin
    panel or a script; hardcoded ones in code via find/replace).
 
-### 3. Transactional email — Abacus notification API
-`app/api/orders/route.ts`, `app/api/admin/orders/route.ts`, and
-`app/api/contact/route.ts` all POST to
-`https://apps.abacus.ai/api/sendNotificationEmail` using `ABACUSAI_API_KEY`
-and per-template `NOTIF_ID_*` values. This stops working the moment the
-Abacus deployment token is revoked.
-1. Pick an email provider you control (Resend, Postmark, SendGrid, etc.).
-2. Recreate the four templates (contact form, order confirmation, new-order
-   admin alert, order status update).
-3. Replace the three `fetch('https://apps.abacus.ai/api/sendNotificationEmail', ...)`
-   calls with calls to the new provider's API/SDK.
+### 3. Transactional email — done in code, needs your Resend account
+Done: all sending now goes through `lib/email.ts` using Resend. Left for
+you:
+1. Create a Resend account, add and verify `elev8wear.al` (DNS records).
+2. Set `RESEND_API_KEY` and `EMAIL_FROM` in `.env` / your host's env vars.
 
 ### 4. Hosting
 The live site is deployed at `elev8.abacusai.app`. Once the above three are

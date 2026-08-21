@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { requireAdmin } from '@/lib/admin';
 import { getSiteSettings } from '@/lib/settings';
+import { sendEmail } from '@/lib/email';
 
 export const dynamic = 'force-dynamic';
 
@@ -45,12 +46,8 @@ async function sendStatusEmail(
   const settings = await getSiteSettings();
   if (!settings.orderStatusEmailsEnabled) return;
   if (!order.email) return;
-  const notifId = process.env.NOTIF_ID_ORDER_STATUS_UPDATE;
-  if (!notifId) return;
 
-  const appUrl = process.env.NEXTAUTH_URL || '';
   const appName = settings.businessName || 'ELEV8';
-  const senderEmail = appUrl ? `noreply@${new URL(appUrl).hostname}` : 'noreply@elev8.abacusai.app';
   const label = STATUS_LABELS_SQ[order.status] || order.status;
   const message = STATUS_MESSAGES_SQ[order.status] || `Statusi i porosisë tuaj u përditësua: ${label}.`;
 
@@ -81,23 +78,12 @@ async function sendStatusEmail(
     </div>
   `;
 
-  try {
-    await fetch('https://apps.abacus.ai/api/sendNotificationEmail', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        deployment_token: process.env.ABACUSAI_API_KEY,
-        app_id: process.env.WEB_APP_ID,
-        notification_id: notifId,
-        subject: `${appName} — Porosia #${order.orderNumber}: ${label}`,
-        body: html,
-        is_html: true,
-        recipient_email: order.email,
-        sender_email: senderEmail,
-        sender_alias: appName,
-      }),
-    });
-  } catch (e) { console.error('Status email failed:', e); }
+  await sendEmail({
+    to: order.email,
+    subject: `${appName} — Porosia #${order.orderNumber}: ${label}`,
+    html,
+    fromName: appName,
+  });
 }
 
 // PATCH: update order status and/or tracking info

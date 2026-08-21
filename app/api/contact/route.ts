@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { getSiteSettings, getAdminNotificationEmail } from '@/lib/settings';
+import { sendEmail } from '@/lib/email';
 
 export const dynamic = 'force-dynamic';
 
@@ -48,7 +49,6 @@ export async function POST(request: Request) {
       </div>
     `;
 
-    const appUrl = process.env.NEXTAUTH_URL ?? '';
     const settings = await getSiteSettings();
     const appName = settings.businessName || 'ELEV8';
     const recipient = await getAdminNotificationEmail();
@@ -56,30 +56,12 @@ export async function POST(request: Request) {
     // Only attempt to send if an internal notification email is configured.
     // The submission is always saved above regardless of email delivery.
     if (recipient) {
-      try {
-        const response = await fetch('https://apps.abacus.ai/api/sendNotificationEmail', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            deployment_token: process.env.ABACUSAI_API_KEY,
-            app_id: process.env.WEB_APP_ID,
-            notification_id: process.env.NOTIF_ID_CONTACT_FORM_SUBMISSION,
-            subject: `New Contact Form Submission from ${name}`,
-            body: htmlBody,
-            is_html: true,
-            recipient_email: recipient,
-            sender_email: appUrl ? `noreply@${new URL(appUrl).hostname}` : 'noreply@elev8.abacusai.app',
-            sender_alias: appName,
-          }),
-        });
-
-        const result = await response.json();
-        if (!result?.success && !result?.notification_disabled) {
-          console.error('Email notification failed:', result);
-        }
-      } catch (emailError) {
-        console.error('Email notification error:', emailError);
-      }
+      await sendEmail({
+        to: recipient,
+        subject: `New Contact Form Submission from ${name}`,
+        html: htmlBody,
+        fromName: appName,
+      });
     }
 
     return NextResponse.json({
