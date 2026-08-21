@@ -56,7 +56,7 @@ export async function POST(request: NextRequest) {
 
     // Upload to S3
     const s3Client = createS3Client();
-    const { bucketName, folderPrefix } = getBucketConfig();
+    const { bucketName, folderPrefix, region } = getBucketConfig();
     const timestamp = Date.now();
     const cloud_storage_path = `${folderPrefix}public/uploads/${timestamp}-product${ext}`;
 
@@ -70,7 +70,6 @@ export async function POST(request: NextRequest) {
     await s3Client.send(putCommand);
 
     // Generate public URL
-    const region = process.env.AWS_REGION || 'us-east-1';
     const publicUrl = `https://${bucketName}.s3.${region}.amazonaws.com/${cloud_storage_path}`;
 
     return NextResponse.json({ publicUrl, cloud_storage_path });

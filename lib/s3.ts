@@ -37,7 +37,7 @@ export async function getFileUrl(
   isPublic: boolean = false
 ): Promise<string> {
   if (isPublic) {
-    const region = process.env.AWS_REGION || "us-east-1";
+    const { region } = getBucketConfig();
     return `https://${bucketName}.s3.${region}.amazonaws.com/${cloud_storage_path}`;
   }
 
