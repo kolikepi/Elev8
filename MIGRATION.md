@@ -67,18 +67,18 @@ and what to do to become fully independent.
   record that pointed at Abacus's hosting IP. Site is live at
   `https://elev8wear.al`, off Abacus entirely.
 
-## Remaining: re-host product images off cdn.abacus.ai
+## Not migrating: current product images
 
 Product/hero images still reference `cdn.abacus.ai` URLs directly (in
 `home-client.tsx`, `about/page.tsx`, `mockup-editor.tsx`, `scripts/seed.ts`,
-and the `Product`/`DtfDesign` rows in the DB). This is **not urgent** —
-`cdn.abacus.ai` is still a live, working CDN for real site visitors, so
-nothing is broken. It only needs to happen before the Abacus account is
-cancelled. This dev session couldn't fetch from `cdn.abacus.ai` itself (its
-egress policy blocks that host), so do it through the app once deployed:
-use the existing "add from URL" admin feature (`/api/admin/upload-url`) per
-product, which downloads the image server-side (Vercel has normal internet
-access) and re-uploads it to the new S3 bucket.
+and the `Product`/`DtfDesign` rows in the DB). Decided not to re-host these
+— they're just placeholder/test photos and will be replaced with real
+product photography anyway. `cdn.abacus.ai` keeps serving them fine in the
+meantime, so this isn't blocking anything.
+
+When real product photos are ready: upload them through `/admin/products`
+(the existing "add from URL" or file-upload flow), which lands on our own
+`elev8wear-uploads` S3 bucket — no cdn.abacus.ai involved for anything new.
 
 ## Rotate secrets
 
@@ -92,7 +92,9 @@ database or email — no action needed beyond not reusing them elsewhere.
 
 ## Last step: cancel the Abacus account
 
-Once you've re-hosted the images (above) and are confident the new stack
-is stable, cancel/downgrade the Abacus.AI account. Everything this app
-needs — database, storage, email, hosting, DNS — now runs on
-infrastructure you own and control directly.
+Once you're confident the new stack is stable, cancel/downgrade the
+Abacus.AI account. Everything this app needs — database, storage, email,
+hosting, DNS — now runs on infrastructure you own and control directly.
+`cdn.abacus.ai` is the one thing still in the loop (serving the current
+placeholder product photos); swap those to real photos through the admin
+panel whenever they're ready, and this dependency goes away too.
