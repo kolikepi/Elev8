@@ -36,39 +36,54 @@ and what to do to become fully independent.
   1 shipping settings row. Still need to put the Neon `DATABASE_URL` in
   `.env` and Vercel's env vars.
 
-## Remaining Abacus dependencies (need your input to finish)
+- **File storage is migrated.** Created our own S3 bucket
+  (`elev8wear-uploads`, `eu-north-1`) with a bucket policy that public-reads
+  only the `public/*` prefix, CORS for browser uploads, and an IAM user
+  (`elev8wear-app`) scoped to just this bucket (`PutObject`/`GetObject`/
+  `DeleteObject`/`ListBucket` — nothing else). Verified end-to-end
+  (put/get/public-read) from a throwaway script before wiring the real
+  credentials in. New uploads through the admin panel now land here, not
+  on Abacus's shared bucket.
+- **Hosting is migrated.** Deployed this repo to Vercel (Production =
+  `claude/elev8wear-faqja-5wv1su`, the repo's only branch), with
+  `DATABASE_URL` (Neon), `RESEND_API_KEY`/`EMAIL_FROM` (Resend), and the
+  `AWS_*` variables set as Vercel env vars. Fixed two Vercel-specific build
+  issues along the way: added `.npmrc` (`legacy-peer-deps=true` — a
+  pre-existing eslint/typescript-eslint peer conflict from the Abacus
+  export made plain `npm install` fail) and a `postinstall: prisma
+  generate` script (Vercel caches `node_modules`, which otherwise skips
+  Prisma's client generation and breaks every DB-backed route). Custom
+  domain `elev8wear.al` is attached and DNS-verified at Host.al (A record
+  `@` → Vercel's IP, CNAME `www` → Vercel's target), replacing the old
+  record that pointed at Abacus's hosting IP. Site is live at
+  `https://elev8wear.al`, off Abacus entirely.
 
-### 1. File storage — Abacus-hosted S3 bucket
-`AWS_BUCKET_NAME=abacusai-apps-...` is a bucket inside Abacus's own AWS
-account, and the app authenticates with an implicit instance credential
-(no access key is stored anywhere) — so uploads simply won't work once this
-runs outside Abacus's hosting.
-1. Create your own S3 bucket (or Cloudflare R2 / another S3-compatible
-   store) and an IAM user scoped to it.
-2. Copy the existing objects from the Abacus bucket into your bucket.
-3. Set `AWS_BUCKET_NAME`, `AWS_REGION`, and real
-   `AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY` in your `.env`.
-4. All product/hero images currently reference `cdn.abacus.ai` URLs directly
-   (in `home-client.tsx`, `about/page.tsx`, `mockup-editor.tsx`, and the
-   `Product` rows in the database). Once you have your own bucket, download
-   those images and re-upload them, then update the URLs (DB rows via admin
-   panel or a script; hardcoded ones in code via find/replace).
+## Remaining: re-host product images off cdn.abacus.ai
 
-### 2. Hosting
-The live site is deployed at `elev8.abacusai.app`. Once storage is migrated,
-deploy this repo to a host you control (Vercel is the easiest fit for
-Next.js) and point your domain (`elev8wear.al`) at it, with `DATABASE_URL`
-(Neon), `RESEND_API_KEY`/`EMAIL_FROM` (Resend), and the AWS variables set
-as environment variables there.
+Product/hero images still reference `cdn.abacus.ai` URLs directly (in
+`home-client.tsx`, `about/page.tsx`, `mockup-editor.tsx`, `scripts/seed.ts`,
+and the `Product`/`DtfDesign` rows in the DB). This is **not urgent** —
+`cdn.abacus.ai` is still a live, working CDN for real site visitors, so
+nothing is broken. It only needs to happen before the Abacus account is
+cancelled. This dev session couldn't fetch from `cdn.abacus.ai` itself (its
+egress policy blocks that host), so do it through the app once deployed:
+use the existing "add from URL" admin feature (`/api/admin/upload-url`) per
+product, which downloads the image server-side (Vercel has normal internet
+access) and re-uploads it to the new S3 bucket.
 
 ## Rotate secrets
 
 The exported `.env` contained live credentials (database password,
 `NEXTAUTH_SECRET`, `ABACUSAI_API_KEY`). They were **not** committed to this
 repo, but since they passed through a downloaded zip file, treat them as
-exposed:
-- Rotate `NEXTAUTH_SECRET` once you cut over (this invalidates existing
-  login sessions, which is fine).
-- The `DATABASE_URL` password and `ABACUSAI_API_KEY` become moot once you
-  migrate off Abacus's database/email per above — no action needed beyond
-  not reusing them elsewhere.
+exposed. `NEXTAUTH_SECRET` was already regenerated fresh for the Vercel
+deployment (never reused the exposed one). The old `DATABASE_URL` password
+and `ABACUSAI_API_KEY` are moot now that the app no longer uses Abacus's
+database or email — no action needed beyond not reusing them elsewhere.
+
+## Last step: cancel the Abacus account
+
+Once you've re-hosted the images (above) and are confident the new stack
+is stable, cancel/downgrade the Abacus.AI account. Everything this app
+needs — database, storage, email, hosting, DNS — now runs on
+infrastructure you own and control directly.
