@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { Inter, Space_Grotesk } from 'next/font/google';
+import { Analytics } from '@vercel/analytics/next';
 import './globals.css';
 import { Providers } from '@/components/providers';
 import { Header } from '@/components/header';
@@ -63,6 +64,7 @@ export default function RootLayout({
           <ScrollToTop />
           <CookieConsent />
         </Providers>
+        <Analytics />
       </body>
     </html>
   );
